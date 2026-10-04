@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>J.A.R.V.I.S.</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #02070d;
+            color: #00d9ff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        .jarvis {
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 38px;
+            letter-spacing: 8px;
+            text-shadow: 0 0 20px #00d9ff;
+        }
+
+        .reactor {
+            width: 180px;
+            height: 180px;
+            margin: 40px auto;
+            border: 4px solid #00d9ff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 30px #00d9ff;
+            animation: pulse 2s infinite;
+        }
+
+        .core {
+            width: 80px;
+            height: 80px;
+            background: #00d9ff;
+            border-radius: 50%;
+            box-shadow: 0 0 40px #00d9ff;
+        }
+
+        @keyframes pulse {
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        button {
+            padding: 14px 20px;
+            margin: 8px;
+            background: #062b3d;
+            color: #00d9ff;
+            border: 1px solid #00d9ff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:hover {
+            background: #0a4058;
+            box-shadow: 0 0 15px #00d9ff;
+        }
+
+        #result {
+            margin: 25px auto;
+            max-width: 700px;
+            font-size: 18px;
+            min-height: 40px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="jarvis">
+
+    <h1>J.A.R.V.I.S.</h1>
+
+    <div class="reactor">
+        <div class="core"></div>
+    </div>
+
+    <p id="status">SYSTEM ONLINE</p>
+
+    <button onclick="jarvisSpeak()">
+        🔊 JARVIS KONUŞ
+    </button>
+
+    <button onclick="listen()">
+        🎤 BENİ DİNLE
+    </button>
+
+    <p id="result">
+        JARVIS hazır, efendim.
+    </p>
+
+</div>
+
+<script src="https://js.puter.com/v2/"></script>
+
+<script>
+
+let konusmaGecmisi = [
+    {
+        role: "system",
+        content:
+            "Sen JARVIS adında zeki ve yardımsever bir yapay zeka asistanısın. " +
+            "Kullanıcı Türkçe konuşuyorsa Türkçe cevap ver. " +
+            "Kullanıcıya efendim diye hitap et. " +
+            "Asla hacı abi deme. " +
+            "Cevaplarını doğal ve anlaşılır ver. " +
+            "Cevaplarında yıldız, iki yıldız veya Markdown biçimlendirmesi kullanma. " +
+            "Emoji kullanmamaya çalış."
+    }
+];
+
+
+// SESLENDİRİLECEK METNİ TEMİZLE
+function sesMetniniTemizle(metin) {
+
+    return metin
+
+        // Markdown yıldızları
+        .replace(/\*/g, "")
+
+        // Alt çizgi
+        .replace(/_/g, "")
+
+        // Başlık işareti
+        .replace(/#/g, "")
+
+        // Kod işaretleri
+        .replace(/`/g, "")
+
+        // Emoji ve semboller
+        .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+        .replace(/[\u{2600}-\u{27BF}]/gu, "")
+        .replace(/[\u{FE00}-\u{FE0F}]/gu, "")
+
+        // Fazla boşlukları temizle
+        .replace(/\s+/g, " ")
+
+        .trim();
+}
+
+
+// JARVIS KONUŞ
+async function jarvisSpeak() {
+
+    const result =
+        document.getElementById("result");
+
+    result.textContent =
+        "🤖 JARVIS düşünüyor...";
+
+    try {
+
+        const cevap =
+            await puter.ai.chat(
+                "Merhaba JARVIS. Türkçe, doğal ve kısa bir şekilde selam ver. Kullanıcıya efendim diye hitap et.",
+                {
+                    model: "gpt-5.6-luna"
+                }
+            );
+
+        let metin = "";
+
+        if (cevap?.message?.content) {
+            metin = cevap.message.content;
+        } else {
+            metin = String(cevap);
+        }
+
+        result.textContent =
+            "JARVIS: " + metin;
+
+        seslendir(metin);
+
+    } catch (error) {
+
+        console.error(error);
+
+        result.textContent =
+            "Hata oluştu: " + error;
+    }
+}
+
+
+// SESLENDİR
+function seslendir(metin) {
+
+    const temizMetin =
+        sesMetniniTemizle(metin);
+
+    speechSynthesis.cancel();
+
+    const ses =
+        new SpeechSynthesisUtterance(temizMetin);
+
+    ses.lang = "tr-TR";
+    ses.rate = 0.9;
+    ses.pitch = 1;
+
+    speechSynthesis.speak(ses);
+}
+
+
+// MİKROFON
+function listen() {
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+
+        document.getElementById("result").textContent =
+            "Bu tarayıcı ses tanımayı desteklemiyor.";
+
+        return;
+    }
+
+    const recognition =
+        new SpeechRecognition();
+
+    recognition.lang = "tr-TR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    document.getElementById("result").textContent =
+        "🎤 Dinliyorum efendim...";
+
+    recognition.start();
+
+
+    recognition.onresult =
+        async function(event) {
+
+            const text =
+                event.results[0][0].transcript;
+
+            document.getElementById("result").textContent =
+                "Sen: " + text;
+
+            await askJarvis(text);
+        };
+
+
+    recognition.onerror =
+        function(event) {
+
+            document.getElementById("result").textContent =
+                "Mikrofon hatası: " +
+                event.error;
+        };
+}
+
+
+// JARVIS'A SOR
+async function askJarvis(text) {
+
+    const result =
+        document.getElementById("result");
+
+    result.textContent =
+        "🤖 JARVIS düşünüyor...";
+
+    try {
+
+        konusmaGecmisi.push({
+            role: "user",
+            content: text
+        });
+
+        const cevap =
+            await puter.ai.chat(
+                konusmaGecmisi,
+                {
+                    model: "gpt-5.6-luna"
+                }
+            );
+
+        let metin = "";
+
+        if (cevap?.message?.content) {
+            metin = cevap.message.content;
+        } else {
+            metin = String(cevap);
+        }
+
+        konusmaGecmisi.push({
+            role: "assistant",
+            content: metin
+        });
+
+        result.textContent =
+            "JARVIS: " + metin;
+
+        seslendir(metin);
+
+    } catch (error) {
+
+        console.error(error);
+
+        result.textContent =
+            "Hata oluştu: " + error;
+    }
+}
+
+</script>
+
+</body>
+</html>
