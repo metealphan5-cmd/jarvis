@@ -73,6 +73,11 @@
             min-height: 40px;
             line-height: 1.6;
         }
+
+        #wakeStatus {
+            font-size: 14px;
+            opacity: 0.8;
+        }
     </style>
 </head>
 
@@ -95,6 +100,10 @@
     <button onclick="listen()">
         🎤 BENİ DİNLE
     </button>
+
+    <p id="wakeStatus">
+        JARVIS bekleme modunda...
+    </p>
 
     <p id="result">
         JARVIS hazır, efendim.
@@ -120,32 +129,22 @@ let konusmaGecmisi = [
     }
 ];
 
+let wakeRecognition = null;
+let wakeAktif = false;
 
-// SESLENDİRİLECEK METNİ TEMİZLE
+
+// SES METNİNİ TEMİZLE
 function sesMetniniTemizle(metin) {
 
     return metin
-
-        // Markdown yıldızları
         .replace(/\*/g, "")
-
-        // Alt çizgi
         .replace(/_/g, "")
-
-        // Başlık işareti
         .replace(/#/g, "")
-
-        // Kod işaretleri
         .replace(/`/g, "")
-
-        // Emoji ve semboller
         .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
         .replace(/[\u{2600}-\u{27BF}]/gu, "")
         .replace(/[\u{FE00}-\u{FE0F}]/gu, "")
-
-        // Fazla boşlukları temizle
         .replace(/\s+/g, " ")
-
         .trim();
 }
 
@@ -157,7 +156,7 @@ async function jarvisSpeak() {
         document.getElementById("result");
 
     result.textContent =
-        "🤖 JARVIS düşünüyor...";
+        "JARVIS düşünüyor...";
 
     try {
 
@@ -211,7 +210,7 @@ function seslendir(metin) {
 }
 
 
-// MİKROFON
+// NORMAL DİNLEME
 function listen() {
 
     const SpeechRecognition =
@@ -234,10 +233,9 @@ function listen() {
     recognition.interimResults = false;
 
     document.getElementById("result").textContent =
-        "🎤 Dinliyorum efendim...";
+        "Dinliyorum efendim...";
 
     recognition.start();
-
 
     recognition.onresult =
         async function(event) {
@@ -250,7 +248,6 @@ function listen() {
 
             await askJarvis(text);
         };
-
 
     recognition.onerror =
         function(event) {
@@ -269,7 +266,7 @@ async function askJarvis(text) {
         document.getElementById("result");
 
     result.textContent =
-        "🤖 JARVIS düşünüyor...";
+        "JARVIS düşünüyor...";
 
     try {
 
@@ -312,6 +309,222 @@ async function askJarvis(text) {
             "Hata oluştu: " + error;
     }
 }
+
+
+// "JARVIS" KELİMESİNİ BEKLE
+function baslatWakeWord() {
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+
+        document.getElementById("wakeStatus").textContent =
+            "Bu tarayıcı otomatik aktivasyonu desteklemiyor.";
+
+        return;
+    }
+
+    if (wakeAktif) {
+        return;
+    }
+
+    wakeAktif = true;
+
+    wakeRecognition =
+        new SpeechRecognition();
+
+    wakeRecognition.lang = "tr-TR";
+    wakeRecognition.continuous = true;
+    wakeRecognition.interimResults = false;
+
+    wakeRecognition.onstart =
+        function() {
+
+            document.getElementById("wakeStatus").textContent =
+                "JARVIS bekliyor... 'JARVIS' deyin.";
+        };
+
+
+    wakeRecognition.onresult =
+        async function(event) {
+
+            const sonSonuc =
+                event.results[event.results.length - 1];
+
+            const duyulan =
+                sonSonuc[0].transcript
+                    .toLowerCase()
+                    .trim();
+
+            console.log("Duyulan:", duyulan);
+
+
+            if (duyulan.includes("jarvis")) {
+
+                speechSynthesis.cancel();
+
+                document.getElementById("wakeStatus").textContent =
+                    "JARVIS AKTİF";
+
+                document.getElementById("result").textContent =
+                    "Sizi dinliyorum efendim...";
+
+
+                let komut =
+                    duyulan
+                        .replace(/jarvis/gi, "")
+                        .trim();
+
+
+                if (komut.length > 0) {
+
+                    await askJarvis(komut);
+
+                    document.getElementById("wakeStatus").textContent =
+                        "JARVIS bekliyor... 'JARVIS' deyin.";
+
+                    return;
+                }
+
+
+                wakeRecognition.stop();
+
+                setTimeout(function() {
+                    komutDinle();
+                }, 300);
+            }
+        };
+
+
+    wakeRecognition.onerror =
+        function(event) {
+
+            console.log(
+                "Wake word hatası:",
+                event.error
+            );
+
+            if (
+                event.error !== "not-allowed" &&
+                event.error !== "service-not-allowed"
+            ) {
+
+                setTimeout(function() {
+
+                    if (wakeAktif) {
+                        baslatWakeWord();
+                    }
+
+                }, 1000);
+            }
+        };
+
+
+    wakeRecognition.onend =
+        function() {
+
+            if (wakeAktif) {
+
+                setTimeout(function() {
+
+                    try {
+                        wakeRecognition.start();
+                    } catch (e) {
+                    }
+
+                }, 500);
+            }
+        };
+
+
+    try {
+        wakeRecognition.start();
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+
+// "JARVIS" DEDİKTEN SONRA KOMUTU DİNLE
+function komutDinle() {
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        return;
+    }
+
+    const commandRecognition =
+        new SpeechRecognition();
+
+    commandRecognition.lang = "tr-TR";
+    commandRecognition.continuous = false;
+    commandRecognition.interimResults = false;
+
+    document.getElementById("result").textContent =
+        "Dinliyorum efendim...";
+
+
+    commandRecognition.start();
+
+
+    commandRecognition.onresult =
+        async function(event) {
+
+            const komut =
+                event.results[0][0].transcript;
+
+            document.getElementById("result").textContent =
+                "Sen: " + komut;
+
+            await askJarvis(komut);
+
+            document.getElementById("wakeStatus").textContent =
+                "JARVIS bekliyor... 'JARVIS' deyin.";
+        };
+
+
+    commandRecognition.onerror =
+        function(event) {
+
+            document.getElementById("result").textContent =
+                "Mikrofon hatası: " +
+                event.error;
+
+            document.getElementById("wakeStatus").textContent =
+                "JARVIS bekliyor... 'JARVIS' deyin.";
+
+            setTimeout(function() {
+                baslatWakeWord();
+            }, 500);
+        };
+
+
+    commandRecognition.onend =
+        function() {
+
+            setTimeout(function() {
+                baslatWakeWord();
+            }, 500);
+        };
+}
+
+
+// SAYFA AÇILDIĞINDA BEKLEMEYE BAŞLA
+window.addEventListener(
+    "load",
+    function() {
+
+        setTimeout(function() {
+            baslatWakeWord();
+        }, 1000);
+
+    }
+);
 
 </script>
 
